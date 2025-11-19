@@ -5,15 +5,20 @@ from tensorflow.keras.layers import GRU
 class GRUNetwork(RecurrentNetwork):
     def __init__(self, units=100, epochs=100, batch_size=16, dropout=0.2, activation='relu', n_days=7):
         """
-        Inizializza la rete neurale ricorrente con layer GRU.
+        Initializes a recurrent neural network using a GRU layer.
 
         Args:
-        - units: Numero di unità nel layer GRU.
-        - epochs: Numero di epoche di addestramento.
-        - batch_size: Dimensione del batch per l'addestramento.
-        - dropout: Percentuale di dropout per prevenire overfitting.
-        - activation: Funzione di attivazione per il layer GRU.
-        - n_days: Numero di giorni di input da considerare per la previsione.
+            units (int): Number of units in the GRU layer.
+            epochs (int): Number of training epochs.
+            batch_size (int): Batch size for training.
+            dropout (float): Dropout rate to prevent overfitting.
+            activation (str): Activation function for the GRU layer.
+            n_days (int): Number of past days to consider as input for the prediction.
+
+        Notes:
+            This class inherits from RecurrentNetwork and sets the recurrent layer
+            to be GRU by default. All training and preprocessing methods are handled
+            by the base class.
         """
         super().__init__(GRU, units, epochs, batch_size, dropout, activation, n_days)
-        # Chiama il costruttore della classe base e imposta la classe del layer come GRU
+        # Calls the base class constructor and sets the layer class to GRU
