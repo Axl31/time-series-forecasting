@@ -1,7 +1,7 @@
 # NSE Stock Price Forecasting
 
 ## Project Overview
-This project focuses on forecasting stock prices using historical time series data from the **National Stock Exchange of India Ltd. (NSE)**. The main goal is to leverage recurrent neural networks (RNNs), including **LSTM** and **GRU**, to predict future stock prices and evaluate model performance using **Root Mean Squared Error (RMSE)**.
+This example focuses on forecasting stock prices using historical time series data from the **National Stock Exchange of India Ltd. (NSE)**. The main goal is to leverage recurrent neural networks (RNNs), including **LSTM** and **GRU**, to predict future stock prices and evaluate model performance using **Root Mean Squared Error (RMSE)**.
 
 ### Dataset
 The dataset is publicly available on Kaggle: [National Stock Exchange Time Series](https://www.kaggle.com/datasets/atulanandjha/national-stock-exchange-time-series)
