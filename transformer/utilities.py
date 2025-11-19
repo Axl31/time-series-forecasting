@@ -1,57 +1,73 @@
-# Importazione delle librerie necessarie da TensorFlow e Keras
+# ============================================================
+# Import required TensorFlow and Keras components
+# ============================================================
 from tensorflow.keras.models import Sequential, model_from_json
-from tensorflow.keras.layers import Dense, Dropout, GRU, LayerNormalization, Conv1D, MultiHeadAttention, LSTM
+from tensorflow.keras.layers import (
+    Dense, Dropout, GRU, LayerNormalization, Conv1D,
+    MultiHeadAttention, LSTM
+)
 from tensorflow.keras import regularizers
-from math import sqrt
 from sklearn.metrics import mean_squared_error
-import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow import keras
 from tensorflow.keras import layers
+from math import sqrt
+import tensorflow as tf
 
+
+# ============================================================
+# Transformer Encoder Block
+# ============================================================
 def transformer_encoder(inputs, head_size, num_heads, ff_dim, dropout=0):
     """
-    Crea un blocco di encoder Transformer.
+    Creates a Transformer encoder block.
 
     Args:
-        inputs: Tensore di input per il blocco di encoder.
-        head_size: Dimensione di ciascun head nel MultiHeadAttention.
-        num_heads: Numero di heads nel MultiHeadAttention.
-        ff_dim: Dimensione dell'input per il feed-forward network.
-        dropout: Tasso di dropout per la regolarizzazione.
+        inputs: Input tensor to the encoder block.
+        head_size: Dimensionality of each attention head.
+        num_heads: Number of attention heads.
+        ff_dim: Hidden layer size in the feed-forward network.
+        dropout: Dropout rate for regularization.
 
     Returns:
-        Un tensore risultante dal blocco di encoder.
+        A tensor resulting from applying Transformer encoder operations.
     """
-    # Normalizzazione Layer per stabilizzare i valori di attivazione
+
+    # Layer Normalization to stabilize activations
     x = layers.LayerNormalization(epsilon=1e-6)(inputs)
 
-    # Applicazione della Multi-Head Attention
+    # Multi-Head Self-Attention
     x = layers.MultiHeadAttention(
-        key_dim=head_size, num_heads=num_heads, dropout=dropout
+        key_dim=head_size,
+        num_heads=num_heads,
+        dropout=dropout
     )(x, x)
 
-    # Applicazione del dropout per la regolarizzazione
+    # Dropout after attention
     x = layers.Dropout(dropout)(x)
 
-    # Residual connection: somma dell'input originale e dell'output dell'attenzione
+    # Residual connection (skip connection)
     res = x + inputs
 
-    # Feed Forward Part: Normalizzazione Layer per stabilizzare l'output
+    # Second Layer Normalization before the feed-forward part
     x = layers.LayerNormalization(epsilon=1e-6)(res)
 
-    # Prima convoluzione per trasformare le rappresentazioni
+    # First feed-forward transformation (1D convolution)
     x = layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(x)
 
-    # Dropout per regolarizzare il feed-forward network
+    # Dropout for regularization
     x = layers.Dropout(dropout)(x)
 
-    # Seconda convoluzione per riportare la dimensione all'input
+    # Second feed-forward transformation to restore original dimensionality
     x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x)
 
-    # Somma del risultato e della connessione residuale
+    # Final residual connection
     return x + res
 
+
+# ============================================================
+# Build Transformer-Based Model
+# ============================================================
 def build_model(
     input_shape,
     head_size,
@@ -63,41 +79,43 @@ def build_model(
     mlp_dropout=0,
 ):
     """
-    Costruisce un modello Keras che utilizza blocchi di encoder Transformer seguiti da una rete MLP.
+    Builds a Keras model using multiple Transformer encoder blocks
+    followed by a Multi-Layer Perceptron (MLP).
 
     Args:
-        input_shape: Forma degli input del modello (es. (timesteps, features)).
-        head_size: Dimensione di ciascun head nel MultiHeadAttention.
-        num_heads: Numero di heads nel MultiHeadAttention.
-        ff_dim: Dimensione dell'input per il feed-forward network.
-        num_transformer_blocks: Numero di blocchi Transformer da utilizzare.
-        mlp_units: Lista delle dimensioni dei layer della MLP.
-        dropout: Tasso di dropout per la regolarizzazione nei blocchi Transformer.
-        mlp_dropout: Tasso di dropout per la regolarizzazione nella MLP.
+        input_shape: Shape of the input (e.g., (timesteps, features)).
+        head_size: Dimensionality of each attention head.
+        num_heads: Number of attention heads.
+        ff_dim: Hidden layer size in the feed-forward network.
+        num_transformer_blocks: Number of Transformer blocks to stack.
+        mlp_units: List defining the number of units for each MLP layer.
+        dropout: Dropout rate inside Transformer blocks.
+        mlp_dropout: Dropout rate inside the MLP layers.
 
     Returns:
-        Modello Keras compilato.
+        A compiled Keras model.
     """
-    # Definizione dell'input del modello
+
+    # Model input definition
     inputs = keras.Input(shape=input_shape)
 
-    # Inizializzazione del tensore di input
+    # Start from the input tensor
     x = inputs
 
-    # Costruzione dei blocchi Transformer
+    # Stack multiple Transformer blocks
     for _ in range(num_transformer_blocks):
         x = transformer_encoder(x, head_size, num_heads, ff_dim, dropout)
 
-    # Global Average Pooling per ridurre la dimensionalità
+    # Global Average Pooling to flatten temporal dimension
     x = layers.GlobalAveragePooling1D(data_format="channels_first")(x)
 
-    # Creazione della parte MLP
-    for dim in mlp_units:
-        x = layers.Dense(dim, activation="relu")(x)  # Layer denso con attivazione ReLU
-        x = layers.Dropout(mlp_dropout)(x)  # Dropout per regolarizzazione
+    # Build the MLP head
+    for units in mlp_units:
+        x = layers.Dense(units, activation="relu")(x)
+        x = layers.Dropout(mlp_dropout)(x)
 
-    # Layer finale per output singolo
+    # Final output layer (regression)
     outputs = layers.Dense(1)(x)
 
-    # Creazione del modello con specifica degli input e output
+    # Create and return the model
     return keras.Model(inputs, outputs)
