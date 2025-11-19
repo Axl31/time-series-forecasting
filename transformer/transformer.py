@@ -5,19 +5,27 @@ import tensorflow as tf
 from sklearn.metrics import mean_squared_error
 from math import sqrt
 
-class Transformer():
-    def __init__(self, head_size=256, num_heads=4, epochs=100, batch_size=16, dropout=0.2, activation='relu', n_days=7):
+
+class Transformer:
+    """
+    A complete Transformer-based forecasting model with utilities for
+    data preparation, training, hyperparameter tuning, saving, loading,
+    and prediction.
+    """
+
+    def __init__(self, head_size=256, num_heads=4, epochs=100, batch_size=16,
+                 dropout=0.2, activation='relu', n_days=7):
         """
-        Inizializza il modello Transformer con i parametri specificati.
+        Initialize the Transformer model with the provided parameters.
 
         Args:
-            head_size (int): Dimensione di ciascun head nel MultiHeadAttention.
-            num_heads (int): Numero di heads nel MultiHeadAttention.
-            epochs (int): Numero di epoche di addestramento.
-            batch_size (int): Dimensione del batch per l'addestramento.
-            dropout (float): Percentuale di dropout per prevenire l'overfitting.
-            activation (str): Funzione di attivazione per i layer densi.
-            n_days (int): Numero di giorni di input da considerare per la previsione.
+            head_size (int): Size of each attention head.
+            num_heads (int): Number of attention heads.
+            epochs (int): Number of training epochs.
+            batch_size (int): Batch size used for training.
+            dropout (float): Dropout rate for regularization.
+            activation (str): Activation function for dense layers.
+            n_days (int): Number of past time steps used for forecasting.
         """
         self.head_size = head_size
         self.num_heads = num_heads
@@ -26,31 +34,37 @@ class Transformer():
         self.dropout = dropout
         self.activation = activation
         self.n_days = n_days
-        self.initialized = False  # Flag per verificare se il modello è stato inizializzato
+        self.initialized = False  # Tracks whether the model is built
 
+    # ----------------------------------------------------------------------
     def upload(self, dataframe, n_test=14):
         """
-        Carica e prepara i dati per l'addestramento e il test.
+        Load and prepare the dataset for training/testing.
 
         Args:
-            dataframe (pd.DataFrame): Il DataFrame contenente i dati.
-            n_test (int): Numero di campioni utilizzati per il test.
+            dataframe (pd.DataFrame): Input dataset.
+            n_test (int): Number of samples used for testing.
         """
         self.df = dataframe
-        self.n_train = len(dataframe) - n_test  # Calcola la dimensione del set di addestramento
-        
-        # Pre-processa i dati e li trasforma in un formato supervisionato
-        self.scaler, self.n_features, self.reframed = dataframe_to_reframe(self.df, self.n_days)
-        
-        # Divide i dati in set di addestramento e test
-        self.train_X, self.train_y, self.test_X, self.test_y = split_reframed(self.reframed, self.n_train, self.n_days, self.n_features)
+        self.n_train = len(dataframe) - n_test
 
+        # Convert dataset into supervised learning format
+        self.scaler, self.n_features, self.reframed = dataframe_to_reframe(
+            self.df, self.n_days
+        )
+
+        # Split data into train and test sets
+        self.train_X, self.train_y, self.test_X, self.test_y = split_reframed(
+            self.reframed, self.n_train, self.n_days, self.n_features
+        )
+
+    # ----------------------------------------------------------------------
     def get_parameters(self):
         """
-        Ritorna i parametri del modello in un dizionario.
+        Return the current model hyperparameters.
 
         Returns:
-            dict: I parametri correnti del modello.
+            dict: Dictionary of model parameters.
         """
         return {
             'head_size': self.head_size,
@@ -60,12 +74,13 @@ class Transformer():
             'dropout': self.dropout
         }
 
+    # ----------------------------------------------------------------------
     def update_parameters(self, params):
         """
-        Aggiorna i parametri del modello.
+        Update the model parameters.
 
         Args:
-            params (dict): Dizionario con i parametri aggiornati.
+            params (dict): New parameters to apply.
         """
         self.head_size = params.get('head_size', self.head_size)
         self.num_heads = params.get('num_heads', self.num_heads)
@@ -73,12 +88,13 @@ class Transformer():
         self.batch_size = params.get('batch_size', self.batch_size)
         self.dropout = params.get('dropout', self.dropout)
 
+    # ----------------------------------------------------------------------
     def initialize(self):
         """
-        Inizializza il modello Transformer utilizzando i parametri specificati.
+        Build and compile the Transformer model using the current parameters.
         """
         self.model = build_model(
-            self.train_X.shape[1:],
+            input_shape=self.train_X.shape[1:],
             head_size=self.head_size,
             num_heads=self.num_heads,
             ff_dim=4,
@@ -87,36 +103,44 @@ class Transformer():
             mlp_dropout=0.4,
             dropout=self.dropout,
         )
-        # Compila il modello con una funzione di perdita e un ottimizzatore
-        self.model.compile(loss='mae', optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4))
+
+        self.model.compile(
+            loss='mae',
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4)
+        )
+
         self.initialized = True
 
+    # ----------------------------------------------------------------------
     def train(self):
         """
-        Allena il modello usando i dati caricati.
+        Train the Transformer model on the prepared dataset.
         """
-        if self.initialized:
-            tf.random.set_seed(1337)  # Imposta un seme per la riproducibilità
-            self.history = self.model.fit(
-                self.train_X, self.train_y,
-                epochs=self.epochs,
-                batch_size=self.batch_size,
-                validation_data=(self.test_X, self.test_y),
-                verbose=0,
-                shuffle=False
-            )
-        else:
-            print('Error: the model is not initialized yet. Call the initialize method and then retry.')
+        if not self.initialized:
+            print("Error: model not initialized. Call initialize() first.")
+            return
 
+        tf.random.set_seed(1337)
+        self.history = self.model.fit(
+            self.train_X, self.train_y,
+            epochs=self.epochs,
+            batch_size=self.batch_size,
+            validation_data=(self.test_X, self.test_y),
+            verbose=0,
+            shuffle=False
+        )
+
+    # ----------------------------------------------------------------------
     def tuning(self, parameters=None):
         """
-        Esegue la ricerca degli iperparametri ottimali.
+        Perform hyperparameter tuning using grid search.
 
         Args:
-            parameters (dict): Dizionario contenente le liste di valori da provare (opzionale).
+            parameters (dict, optional): Dictionary containing lists of
+                                         hyperparameters to test.
 
         Returns:
-            list: Il migliore RMSE e i parametri corrispondenti.
+            list: Best RMSE and the corresponding parameters.
         """
         if parameters is None:
             parameters = {
@@ -127,17 +151,15 @@ class Transformer():
                 "dropout": [0.2]
             }
 
-        models = []
-        params = []
-        rmses = []
+        models, params, rmses = [], [], []
 
-        # Itera su tutti i valori degli iperparametri
+        # Iterate through hyperparameter combinations
         for head_size in parameters['head_size']:
             for epochs in parameters['epochs']:
                 for batch_size in parameters['batch_size']:
                     for dropout in parameters['dropout']:
                         for num_heads in parameters['num_heads']:
-                            # Costruisce e compila il modello
+
                             model = build_model(
                                 self.train_X.shape[1:],
                                 head_size=head_size,
@@ -150,48 +172,71 @@ class Transformer():
                             )
                             model.compile(loss='mae', optimizer='adam')
 
-                            # Allena il modello
                             history = model.fit(
                                 self.train_X, self.train_y,
-                                epochs=epochs, batch_size=batch_size,
+                                epochs=epochs,
+                                batch_size=batch_size,
                                 validation_data=(self.test_X, self.test_y),
-                                verbose=0, shuffle=False
+                                verbose=0,
+                                shuffle=False
                             )
 
-                            # Previsione e calcolo dell'RMSE
+                            # Forecast
                             tf.random.set_seed(1337)
                             yhat = model.predict(self.test_X)
 
-                            # Reshape dei dati per la scalatura inversa
-                            test_X_reshaped = self.test_X.reshape((self.test_X.shape[0], self.n_features * self.n_days))
-                            inv_yhat = self.scaler.inverse_transform(np.concatenate((yhat, test_X_reshaped[:, -self.n_features+1:]), axis=1))[:, 0]
-                            inv_y = self.scaler.inverse_transform(np.concatenate((self.test_y.reshape((len(self.test_y), 1)), test_X_reshaped[:, -self.n_features+1:]), axis=1))[:, 0]
-                            
-                            # Calcolo dell'RMSE
-                            rmse = sqrt(mean_squared_error(inv_y, inv_yhat))
-                            rmses.append(rmse)
-                            models.append(model)
-                            params.append([head_size, num_heads, epochs, batch_size, dropout])
-                            
-                            print(f"RMSE: {rmse}, Parameters: {head_size}, {num_heads}, {epochs}, {batch_size}, {dropout}")
+                            # Inverse scaling
+                            test_X_reshaped = self.test_X.reshape(
+                                (self.test_X.shape[0],
+                                 self.n_features * self.n_days)
+                            )
 
-        # Trova il miglior modello e i parametri
-        min_rmse_index = rmses.index(min(rmses))
-        self.model = models[min_rmse_index]
+                            inv_yhat = self.scaler.inverse_transform(
+                                np.concatenate(
+                                    (yhat, test_X_reshaped[:, -self.n_features+1:]),
+                                    axis=1
+                                )
+                            )[:, 0]
+
+                            inv_y = self.scaler.inverse_transform(
+                                np.concatenate(
+                                    (self.test_y.reshape((len(self.test_y), 1)),
+                                     test_X_reshaped[:, -self.n_features+1:]),
+                                    axis=1
+                                )
+                            )[:, 0]
+
+                            rmse = sqrt(mean_squared_error(inv_y, inv_yhat))
+
+                            models.append(model)
+                            rmses.append(rmse)
+                            params.append(
+                                [head_size, num_heads, epochs, batch_size, dropout]
+                            )
+
+                            print(f"RMSE: {rmse}, Parameters: "
+                                  f"{head_size}, {num_heads}, {epochs}, "
+                                  f"{batch_size}, {dropout}")
+
+        # Retrieve the best model
+        best_index = rmses.index(min(rmses))
+        self.model = models[best_index]
         self.model.compile(loss='mae', optimizer='adam')
 
-        # Aggiorna i parametri con quelli ottimali
-        self.head_size, self.num_heads, self.epochs, self.batch_size, self.dropout = params[min_rmse_index]
-        return [rmses[min_rmse_index], params[min_rmse_index]]
+        # Update parameters
+        self.head_size, self.num_heads, self.epochs, self.batch_size, self.dropout = params[best_index]
 
+        return [rmses[best_index], params[best_index]]
+
+    # ----------------------------------------------------------------------
     def save(self, path):
         """
-        Salva il modello e i suoi iperparametri su disco.
+        Save model architecture, weights, and hyperparameters.
 
         Args:
-            path (str): Il percorso in cui salvare il modello.
+            path (str): Directory in which to save the model.
         """
-        # Salva gli iperparametri in un file Excel
+        # Save hyperparameters
         df = pd.DataFrame({
             'head_size': [self.head_size],
             'num_heads': [self.num_heads],
@@ -201,53 +246,68 @@ class Transformer():
         })
         df.to_excel(f'{path}HP.xlsx')
 
-        # Serializza e salva il modello
+        # Save model architecture and weights
         model_json = self.model.to_json()
         with open(f'{path}model.json', "w") as json_file:
             json_file.write(model_json)
+
         self.model.save_weights(f"{path}model.h5")
         print("Model saved to disk.")
 
+    # ----------------------------------------------------------------------
     def load(self, path):
         """
-        Carica il modello e i suoi iperparametri da disco.
+        Load model architecture, weights, and hyperparameters.
 
         Args:
-            path (str): Il percorso da cui caricare il modello.
+            path (str): Directory from which to load the model.
         """
-        # Carica gli iperparametri da un file Excel
         df = pd.read_excel(f'{path}HP.xlsx', index_col=0)
+
         self.head_size = df['head_size'][0]
         self.num_heads = df['num_heads'][0]
         self.epochs = df['epochs'][0]
         self.batch_size = df['batch_size'][0]
         self.dropout = df['dropout'][0]
 
-        # Carica e compila il modello
+        # Load model JSON
         with open(f'{path}model.json', 'r') as json_file:
             loaded_model_json = json_file.read()
+
         self.model = model_from_json(loaded_model_json)
         self.model.load_weights(f"{path}model.h5")
         self.model.compile(loss='mae', optimizer='adam')
+
         print("Model loaded from disk.")
 
+    # ----------------------------------------------------------------------
     def forecast(self):
         """
-        Esegue la previsione sui dati di test.
+        Run forecasting on the test dataset.
 
         Returns:
-            list: Una lista contenente l'RMSE, le previsioni e i valori reali.
+            list: RMSE, predictions, actual values, and labels.
         """
-        tf.random.set_seed(1337)  # Imposta un seme per la riproducibilità
+        tf.random.set_seed(1337)
         yhat = self.model.predict(self.test_X)
 
-        # Reshape dei dati per la scalatura inversa
-        test_X_reshaped = self.test_X.reshape((self.test_X.shape[0], self.n_features * self.n_days))
-        self.inv_yhat = self.scaler.inverse_transform(np.concatenate((yhat, test_X_reshaped[:, -self.n_features+1:]), axis=1))[:, 0]
-        self.inv_y = self.scaler.inverse_transform(np.concatenate((self.test_y.reshape((len(self.test_y), 1)), test_X_reshaped[:, -self.n_features+1:]), axis=1))[:, 0]
-        
-        # Calcola l'RMSE
+        # Inverse transformation
+        test_X_reshaped = self.test_X.reshape(
+            (self.test_X.shape[0], self.n_features * self.n_days)
+        )
+
+        self.inv_yhat = self.scaler.inverse_transform(
+            np.concatenate((yhat, test_X_reshaped[:, -self.n_features+1:]), axis=1)
+        )[:, 0]
+
+        self.inv_y = self.scaler.inverse_transform(
+            np.concatenate(
+                (self.test_y.reshape((len(self.test_y), 1)),
+                 test_X_reshaped[:, -self.n_features+1:]),
+                axis=1
+            )
+        )[:, 0]
+
         self.rmse = sqrt(mean_squared_error(self.inv_y, self.inv_yhat))
+
         return [self.rmse, self.inv_yhat, self.inv_y, ['rmse', 'prediction', 'actual']]
-
-
