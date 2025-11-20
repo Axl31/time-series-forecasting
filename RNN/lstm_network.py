@@ -1,4 +1,4 @@
-from recurrent_network import RecurrentNetwork
+from RNN.recurrent_network import RecurrentNetwork
 
 from tensorflow.keras.layers import LSTM
 
