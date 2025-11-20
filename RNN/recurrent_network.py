@@ -1,6 +1,6 @@
 from RNN.utilities import dataframe_to_reframe, split_reframed
 from tensorflow.keras.models import Sequential, model_from_json
-from tensorflow.keras.layers import LSTM, GRU, Dropout, Dense
+from tensorflow.keras.layers import LSTM, GRU, Dropout, Dense, Input
 from tensorflow.keras import regularizers
 import pandas as pd
 import numpy as np
@@ -166,14 +166,12 @@ class RecurrentNetwork:
                 for batch_size in parameters['batch_size']:
                     for dropout in parameters['dropout']:
                         model = Sequential()
-                        self.model.add(
-                            Input(shape=(self.train_X.shape[1], self.train_X.shape[2]))
-                        )
                         if cudnn:
                             model.add(
                                 self.layer_class(
                                     units, activation='tanh', recurrent_activation='sigmoid',
                                     recurrent_dropout=0, unroll=False, use_bias=True,
+                                    input_shape=(self.train_X.shape[1], self.train_X.shape[2]),
                                     kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
                                     bias_regularizer=regularizers.L2(1e-4),
                                     activity_regularizer=regularizers.L2(1e-5)
@@ -184,6 +182,7 @@ class RecurrentNetwork:
                                 self.layer_class(
                                     units, activation='relu',
                                     kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
+                                    input_shape=(self.train_X.shape[1], self.train_X.shape[2]),
                                     bias_regularizer=regularizers.L2(1e-4),
                                     activity_regularizer=regularizers.L2(1e-5)
                                 )
