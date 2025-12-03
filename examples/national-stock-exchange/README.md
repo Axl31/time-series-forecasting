@@ -4,7 +4,7 @@
 This example focuses on forecasting stock prices using historical time series data from the **National Stock Exchange of India Ltd. (NSE)**. The main goal is to leverage recurrent neural networks (RNNs), including **LSTM** and **GRU**, to predict future stock prices and evaluate model performance using **Root Mean Squared Error (RMSE)**.
 
 ### Dataset
-The dataset is publicly available on Kaggle: [National Stock Exchange Time Series](https://www.kaggle.com/datasets/atulanandjha/national-stock-exchange-time-series)
+The dataset is publicly available on Kaggle: [National Stock Exchange Time Series](https://www.kaggle.com/datasets/atulanandjha/national-stock-exchange-time-series). Download the CSV files and place them in a folder named `data`.
 
 **Context:**  
 The NSE is one of the largest stock exchanges in India, established in 1992 in Mumbai. It was the first demutualized electronic exchange in India and launched screen-based trading in 1994. NSE introduced index futures and online trading, becoming the country’s largest exchange by turnover.
